@@ -3,6 +3,12 @@ const entityClass = 'with_entity';
 const entityWrapperClass = `entity_wrapper`;
 
 class View {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.timecode = 0;
+    }
+
     setHandlerInput(changeSizeFieldClbk) {
         document.getElementById('size_field').addEventListener('change', (event) => {     
             const value = event.target.value;
@@ -32,63 +38,57 @@ class View {
         });
     }
 
-    createCell(controller) {
-        const elemTable = document.createElement('div');
-        elemTable.classList.add(entityWrapperClass);
-        let posId = 0;
+    addGrid(controller) {
+        // added grids
+        const sizeField = controller.model.sizeField;     	    
+        const rangeWidth = this.canvas.width / sizeField;
+        const rangeHeight = this.canvas.height / sizeField;
 
-        for (let i = 0; i < controller.model.sizeField; i += 1) {
-            const elemTr = document.createElement('div');
-
-            for (let j = 0; j < controller.model.sizeField; j += 1) {
-                const elemTd = document.createElement('div');
-                elemTd.id = posId++;
-                elemTd.classList.add(emptyClass);
-                elemTd.addEventListener('click', controller.model.changeBacteria.bind(controller.model));
-                elemTr.appendChild(elemTd);
-            }
-
-            elemTable.appendChild(elemTr);
+        this.ctx.strokeStyle = `#000`;
+        for (let i = 0; i < sizeField; i++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(i * rangeWidth, 0);
+            this.ctx.lineTo(i * rangeWidth, this.canvas.height);
+            this.ctx.stroke();
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, i * rangeHeight);
+            this.ctx.lineTo(this.canvas.width, i * rangeHeight);
+            this.ctx.stroke();
         }
-
-        return elemTable;
     }
-    
-    generateBacterialsPosition(controller) {
-        const main = document.querySelector('.main');
 
-        if (main.childNodes.length === Math.pow(controller.model.sizeField, 2)) return;
-
-        main.innerHTML = '';
-        const cell = this.createCell(controller);
-        if (main) main.appendChild(cell);
+    updateCanvas() {
+        const main = document.querySelector(".main");
+        this.canvas = document.getElementById("canvas");
+        canvas.addEventListener('click', controller.model.changeBacteria.bind(controller.model));
+        canvas.width  = main.clientWidth;
+        canvas.height = main.clientHeight;  
+        this.ctx = canvas.getContext('2d'); 
+        this.addGrid(controller);
     }
 
     updateBacterialsPosition(controller) {
-        const bacteriaPositionOld = controller.model.bacteriaPositionOld;
+        if (!this.canvas) this.updateCanvas();
+        
         const bacteriaPosition = controller.model.bacteriaPosition;
-
-        for (let i = 0; i < bacteriaPositionOld.length; i++) {
-            if (bacteriaPosition.includes(bacteriaPositionOld[i])) {
-                const elem = document.getElementById(bacteriaPositionOld[i]);
-                elem?.classList?.add(entityClass);
-            } else {
-                const elem = document.getElementById(bacteriaPositionOld[i]);
-                elem?.classList?.remove(entityClass);
-            }
-        }
-
-        for (let i = 0; i < bacteriaPosition.length; i++) {
-            if (!bacteriaPositionOld.includes(bacteriaPosition[i])) {
-                const elem = document.getElementById(bacteriaPosition[i]);
-                elem?.classList?.add(entityClass);
-            } 
-        }
+        const sizeField = controller.model.sizeField;     	    
+        const rangeWidth = this.canvas.width / sizeField;
+        const rangeHeight = this.canvas.height / sizeField;
+        this.ctx.fillStyle = `#888`
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.addGrid(controller);
+        // added bacteria
+        bacteriaPosition.forEach((col, y) => col.forEach((_, x) => {
+            bacteriaPosition[y][x] ? this.ctx.fillStyle = `lime` : this.ctx.fillStyle = `#00000000`;
+            this.ctx.fillRect(x * rangeWidth, y * rangeHeight, rangeWidth, rangeHeight);
+        }));
     }
 
     redraw() {
-        this.view.generateBacterialsPosition(this);
         this.view.updateBacterialsPosition(this);
+        const timecode = new Date(); 
+        console.log(`+${(timecode - this.view.timecode) / 1000}`); // Performance - time between renders
+        this.view.timecode = timecode;
     }
 }
 

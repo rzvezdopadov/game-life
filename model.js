@@ -1,15 +1,17 @@
 const STATUS_GAME_IN_PROCESS = 0;
 const STATUS_GAME_STOP = 1;
+const LEVEL_SPEED = 1000;
 
-const LEVEL_SPEED = 500;
+const NEIGHBORS = [
+    [-1, -1], [-1, 0], [-1, 1], [1, -1],
+    [1, 0], [1, 1], [0, 1], [0, -1]
+];
 
 class Model {
     constructor() {
-        this.sizeField = 50;
+        this.sizeField = 20;
         this.status = STATUS_GAME_STOP;
-        this.bacteriaPositionOld = [];
         this.bacteriaPosition = [];
-
         this.render = () => {};
         this.timer = null;
     }
@@ -18,14 +20,21 @@ class Model {
         if (value < 5 || this.status !== STATUS_GAME_STOP) return;
 
         this.sizeField = Number(value);
+        this.clearState();
         this.render();
     }
 
     clearState() {
         this.status = STATUS_GAME_STOP;
-        this.bacteriaPositionOld = [];
         this.bacteriaPosition = [];
-        this.render();
+
+        for (let x = 0; x < this.sizeField; x++) {
+            this.bacteriaPosition.push([]);
+
+            for (let y = 0; y < this.sizeField; y++) {
+                this.bacteriaPosition[x][y] = false; 
+            }   
+        } 
     }
 
     startGame() {
@@ -39,9 +48,10 @@ class Model {
     stopGame() {
         this.clearState();
 
-        if (model.timer) clearTimeout(model.timer);
+        if (model.timer) clearInterval(model.timer);
 
         model.timer = null;
+        this.render();
     }
 
     reloadGame() {
@@ -53,60 +63,47 @@ class Model {
     }
 
     generateRandomBacterias() {
-        let bacteriaArr = [];
-        const maxField = this.sizeField * this.sizeField;
-        
-        for (let i = 0; i < maxField; i++) {
-            const randomPos = Math.round(Math.random() * maxField);
-            bacteriaArr.push(randomPos)
-        }
+        if (this.status === STATUS_GAME_IN_PROCESS) return;
 
-        bacteriaArr = Array.from(new Set(bacteriaArr));
+        this.clearState();
 
-        this.bacteriaPosition = bacteriaArr;
-        this.bacteriaPositionOld = bacteriaArr;
+        for (let x = 0; x < this.sizeField; x++) {
+            for (let y = 0; y < this.sizeField; y++) {
+                this.bacteriaPosition[x][y] = Math.round(Math.random() * 2) ? false : true; 
+            }   
+        } 
+
         this.render();
     }
 
     changeBacteria(event) {
-        const id = Number(event.target.id);
-        const position = this.bacteriaPosition.findIndex((value) => value === id);
-        
-        if (position === -1) {
-            this.bacteriaPosition.push(id);
-            this.bacteriaPositionOld.push(id);
-        } else {
-            this.bacteriaPosition.splice(position, 1);
-            this.bacteriaPositionOld.splice(position, 1);
-        }   
+        const x = Math.floor((event.pageX - event.currentTarget.offsetLeft) / (event.target.width / this.sizeField)); 
+        const y = Math.floor((event.pageY - event.currentTarget.offsetTop) / (event.target.height / this.sizeField)); 
 
+        this.bacteriaPosition[y][x] = !this.bacteriaPosition[y][x];
         this.render();
     }
 
+    isAlive(pointX, pointY) {
+        const count = NEIGHBORS.reduce((sum, diff) => {
+            const x = pointX - diff[0];
+            const y = pointY - diff[1];
+            let newX = x;
+            let newY = y;
+            // Transforms a surface into a torus 
+            if (x < 0) newX = this.sizeField - 1;
+            if (y < 0) newY = this.sizeField - 1;
+            if (x > this.sizeField - 1) newX = 0;
+            if (y > this.sizeField - 1) newY = 0;
+            return (newX < 0 || newX >= this.bacteriaPosition[0].length || newY < 0 || newY >= this.bacteriaPosition.length) ?
+                sum : sum + this.bacteriaPosition[newY][newX];
+        }, 0);
+
+        return this.bacteriaPosition[pointY][pointX] ? (count === 2 || count === 3) : count === 3;
+    }
+
     engineGame() {
-        this.bacteriaPositionOld = [...this.bacteriaPosition];
-
-        const newBacteriaPosition = [];
-        const maxField = this.sizeField * this.sizeField;
-              
-        for (let i = 0; i < maxField; i++) {
-            let summ = -1;
-            const arrTest = [];
-            for (let x = -1; x <= 1; x++) {
-                for (let y = -1; y <= 1; y++) {
-                    let coordAdjanced = i + x + y * this.sizeField;
-
-                    if (coordAdjanced > maxField) coordAdjanced = coordAdjanced - maxField;
-                    if (coordAdjanced < 0) coordAdjanced = maxField + coordAdjanced;
-                    arrTest.push(coordAdjanced);
-                    if ((this.bacteriaPosition.includes(coordAdjanced))) summ++;
-                }    
-            }
-            
-            if ((summ === 2) || (summ === 3)) newBacteriaPosition.push(i);
-        }
-        console.log(newBacteriaPosition);
-        this.bacteriaPosition = newBacteriaPosition;
+        this.bacteriaPosition = this.bacteriaPosition.map((row, y) => row.map((_, x) => this.isAlive(x, y)));
         this.render();
     }
 
